@@ -1,7 +1,7 @@
 ReifyCSV
 ========
 
-Introduction goes here.
+this plug-in has been created for my bachelor-thesis. it will provide basic csv import and exporting functionality for ActiveRecord-models...
 
 
 Example
@@ -9,5 +9,10 @@ Example
 
 Example goes here.
 
+== TODO
 
-Copyright (c) 2008 [name of plugin creator], released under the MIT license
+everything
+
+Copyright (c) 2008 [jhedtrich@gmail.com], released under the MIT license
+
+
