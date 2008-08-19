@@ -4,4 +4,5 @@ config.gem 'fastercsv'
 config.after_initialize do
   # Include our helper into every view
   ActiveRecord::Base.send :include, ReifyCSV
+  require 'hooks'
 end
