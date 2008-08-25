@@ -6,7 +6,7 @@ class Array
     if self.all?{|element| element.kind_of? ActiveRecord::Base}
       has_cols = options.has_key? :columns
       cols = options[:columns]
-      FasterCSV.generate(options.except :columns) do |csv|
+      FasterCSV.generate(options.except(:columns)) do |csv|
         self.each{|element| csv << (has_cols ? element.generate_line({:columns => cols}) : element.generate_line)}
       end
     elsif self.all?{|element| element.kind_of? Array}

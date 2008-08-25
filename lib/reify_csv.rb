@@ -8,7 +8,13 @@ module ReifyCSV
   
   def generate_line(options = Hash.new)
     columns = options[:columns] || self.class.csv_columns
-    columns.map{|col| self[col]}
+    includes = options[:include] || {}
+    data = columns.map{|col| self[col]}
+    includes.each do |rec, cols|
+     associated_record = self.send rec
+     data += cols.map{|col| associated_record ? associated_record[col] : nil}
+    end
+    data
   end
   
   module ClassMethods
@@ -19,17 +25,24 @@ module ReifyCSV
     # make it possible to include has_one/belongs_to associations
     def to_csv(*args)
       options = args.pop || {}
-      columns, finder = rcsv_parse_export_options(options)
+      columns, finder, incs = rcsv_parse_export_options(options)
       # remove select option for now, might bork 
-      find_options = options.except :columns, :select
+      find_options = options.except :columns, :select, :include
+      args << find_options.merge({:include => incs.keys})
 #     probably escape the fields properly...
-      args << find_options.merge({:select => columns.join(", ")})
+#     args << find_options.merge({:select => columns.join(", "), :include => incs.keys})
       csv_string = FasterCSV.generate do |csv|
-        csv << columns
+        csv << generate_header(columns, incs)
         objects = self.find(:all, *args)
-        objects.each{|object| csv << object.generate_line({:columns => columns})}
+        objects.each do |object|
+          csv << object.generate_line({:columns => columns, :include => incs})
+        end
       end
       csv_string
+    end
+    
+    def generate_header(columns, includes)
+      columns + includes.map{|a,b| b.map{|c| "#{a} #{c}"}}.flatten
     end
   
     # implement
@@ -73,20 +86,34 @@ module ReifyCSV
       [data.size, errors]
     end
 
+    protected
+    
+    def rcsv_valid_associations
+      [:belongs_to, :has_one]
+    end
+    
     def rcsv_parse_export_options(options) #:nodoc:
       raise ArgumentError, 'parameter hash expected' unless options.respond_to? :symbolize_keys
       options = options.symbolize_keys
-     # raise ArgumentError, ':page parameter required' unless options.key? :page
-      
-  #    if options[:count] and options[:total_entries]
-  #      raise ArgumentError, ':count and :total_entries are mutually exclusive'
-  #    end
 
       columns = options[:columns] || self.csv_columns
       finder = options[:finder]
+      # sanitize include options, make all to symbols...
+      including = options[:include] || {}
+      incs = {}
+      if including.is_a? Hash
+        including.each do |inc, cols|
+          raise ArgumentError, 'Association could not be found' unless (assoc = self.reflect_on_association(inc))
+          raise ArgumentError, 'Invalid association type: #{assoc.macro}' unless (rcsv_valid_associations.include? assoc.macro)
+        end
+        incs = including
+      else
+        raise ArgumentError, 'Hash expected...'  
+      end
+      
   #    per_page = options[:per_page] || self.per_page
   #    total = options[:total_entries]
-      [columns, finder]
+      [columns, finder, incs]
     end
     
     def rcsv_parse_import_options(options) #:nodoc:
