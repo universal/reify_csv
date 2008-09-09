@@ -2,7 +2,7 @@ module ReifyCSV
   def self.included(base)
     base.extend ClassMethods
     class << base
-      define_method(:csv_columns) {["id"] + content_columns.map{|cc| cc.name} - ["created_at", "updated_at"]} unless respond_to?(:csv_columns)
+      define_method(:csv_columns) { columns.map{|cc| cc.name} - ["created_at", "updated_at"]} unless respond_to?(:csv_columns)
     end
   end
   
@@ -61,7 +61,8 @@ module ReifyCSV
       if headers
         # check if to_s is necessary
         raise(ArgumentError, "'Find by' columns specified are not included in the actual data.") if find_by.any?{|col| !data.headers.include?(col.to_s)}
-        raise(ArgumentError, "'Find by' columns are not model attributes") if find_by.any?{|col| !column_names.include?(col.to_s) }
+        raise(ArgumentError, "'Find by' columns are not model attributes") if find_by.any?{|col| !column_names.include?(col.to_s)}
+        
         i = 0
         
         finder = "find_by_" + find_by.map{|col| col.to_s}.join("_and_")
@@ -101,19 +102,28 @@ module ReifyCSV
       # sanitize include options, make all to symbols...
       including = options[:include] || {}
       incs = {}
-      if including.is_a? Hash
-        including.each do |inc, cols|
-          raise ArgumentError, 'Association could not be found' unless (assoc = self.reflect_on_association(inc))
-          raise ArgumentError, 'Invalid association type: #{assoc.macro}' unless (rcsv_valid_associations.include? assoc.macro)
+      if including.is_a? Array
+        including.each do |inc|
+          assoc = check_and_return_association(inc)
+          incs[inc] = assoc.klass.csv_columns
         end
+      elsif including.is_a? Hash
+        including.keys.each{|inc| check_and_return_association(inc)}
         incs = including
       else
-        raise ArgumentError, 'Hash expected...'  
+        raise ArgumentError, 'Array or Hash expected for including'  
       end
       
   #    per_page = options[:per_page] || self.per_page
   #    total = options[:total_entries]
       [columns, finder, incs]
+    end
+    
+    def check_and_return_association(association)
+      raise ArgumentError, 'Association could not be found' unless (assoc = self.reflect_on_association(association))
+      raise ArgumentError, 'Invalid association type: #{assoc.macro}' unless (rcsv_valid_associations.include? assoc.macro)
+      raise ArgumentError, 'Sorry, through and polymorphic associations are unsupported currently' if (assoc.options.include?(:through) || assoc.options.include?(:as) || assoc.options[:polymorphic])
+      assoc
     end
     
     def rcsv_parse_import_options(options) #:nodoc:

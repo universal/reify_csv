@@ -18,3 +18,11 @@ class Array
     end
   end
 end
+
+class ActiveRecord::Associations::HasManyAssociation
+  def to_csv
+    puts "i got called! i'm here!'"
+    puts @reflection.inspect
+    inspect
+  end
+end
